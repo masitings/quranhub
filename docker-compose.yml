@@ -1,32 +1,6 @@
 version: '3.8'
 
 services:
-  postgres:
-    image: postgres:15-alpine
-    container_name: quranhub_postgres
-    environment:
-      POSTGRES_USER: ${DB_USERNAME:-quranhub}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-quranhub_password}
-      POSTGRES_DB: ${DB_NAME:-quranhub}
-      PGDATA: /var/lib/postgresql/data/pgdata
-    # Port mapping - Dokploy may handle this automatically
-    # Uncomment if you need direct database access
-    # ports:
-    #   - "${DB_PORT:-5432}:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      # Automatically load database dump on first initialization
-      - ./database/quranhub_snapshot_dump.sql:/docker-entrypoint-initdb.d/init.sql:ro
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-quranhub} -d ${DB_NAME:-quranhub}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-    networks:
-      - quranhub_network
-    restart: unless-stopped
-
   app:
     build:
       context: .
@@ -35,33 +9,20 @@ services:
     environment:
       DB_USERNAME: ${DB_USERNAME:-quranhub}
       DB_PASSWORD: ${DB_PASSWORD:-quranhub_password}
-      DB_HOST: postgres
+      DB_HOST: ${DB_HOST:-localhost}
       DB_PORT: ${DB_PORT:-5432}
       DB_NAME: ${DB_NAME:-quranhub}
       # Construct DATABASE_URL from components (URL encoding for special characters in password)
-      DATABASE_URL: postgresql://${DB_USERNAME:-quranhub}:${DB_PASSWORD:-quranhub_password}@postgres:${DB_PORT:-5432}/${DB_NAME:-quranhub}
+      DATABASE_URL: postgresql://${DB_USERNAME:-quranhub}:${DB_PASSWORD:-quranhub_password}@${DB_HOST:-localhost}:${DB_PORT:-5432}/${DB_NAME:-quranhub}
     # Port mapping - Dokploy will handle this automatically via reverse proxy
     # Keep this for local development or if Dokploy doesn't auto-detect
     ports:
       - "${APP_PORT:-8080}:8080"
-    depends_on:
-      postgres:
-        condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health/liveness')"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
-    networks:
-      - quranhub_network
     restart: unless-stopped
-
-volumes:
-  postgres_data:
-    driver: local
-
-networks:
-  quranhub_network:
-    driver: bridge
 

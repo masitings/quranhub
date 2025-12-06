@@ -7,60 +7,71 @@ This guide will help you deploy the Quran Hub API on Dokploy.
 - A Dokploy instance running and accessible
 - Git repository with this codebase
 - Access to configure environment variables in Dokploy
+- **External PostgreSQL database** (the docker-compose file does not include a PostgreSQL service)
 
 ## Deployment Steps
 
-### 1. Prepare Your Repository
+### 1. Prepare Your Database
+
+**Important:** This application requires an external PostgreSQL database. You need to:
+
+1. Set up a PostgreSQL database (can be on Dokploy, cloud provider, or external server)
+2. Load the database dump (`database/quranhub_snapshot_dump.sql`) into your PostgreSQL instance
+3. Note the database connection details (host, port, username, password, database name)
+
+### 2. Prepare Your Repository
 
 Ensure your repository contains:
 - `docker-compose.yml` ✅
 - `Dockerfile` ✅
 - `requirements.txt` ✅
-- `database/quranhub_snapshot_dump.sql` ✅
 
-### 2. Create a New Application in Dokploy
+### 3. Create a New Application in Dokploy
 
 1. Log in to your Dokploy dashboard
 2. Navigate to **Applications** → **New Application**
 3. Select **Docker Compose** as the deployment method
 4. Connect your Git repository (GitHub, GitLab, or Bitbucket)
 
-### 3. Configure Environment Variables
+### 4. Configure Environment Variables
 
 In Dokploy's environment variables section, set the following:
 
 ```env
-DB_USERNAME=quranhub
-DB_PASSWORD=your_secure_password_here
-DB_HOST=postgres
+DB_USERNAME=your_database_username
+DB_PASSWORD=your_database_password
+DB_HOST=your_database_host
 DB_PORT=5432
-DB_NAME=quranhub
+DB_NAME=your_database_name
 APP_PORT=8080
 ```
 
 **Important:** 
-- Use a strong password for `DB_PASSWORD`
-- The `DB_HOST` should remain as `postgres` (the service name in docker-compose)
-- Dokploy will automatically set up the `DATABASE_URL` if needed
+- `DB_HOST` should be the hostname or IP address of your external PostgreSQL database
+  - If using Dokploy's database service, use the service name or connection string provided
+  - If using a cloud database (AWS RDS, DigitalOcean, etc.), use the provided hostname
+  - If using a self-hosted database, use the server's IP or domain name
+- `DB_PORT` is typically `5432` for PostgreSQL
+- Ensure your database is accessible from the Dokploy network
+- The `DATABASE_URL` will be automatically constructed from these variables
 
-### 4. Configure Domain (Optional)
+### 5. Configure Domain (Optional)
 
 1. In Dokploy, go to your application settings
 2. Navigate to **Domains**
 3. Add your custom domain (e.g., `api.quranhub.com`)
 4. Dokploy will automatically configure SSL certificates via Let's Encrypt
 
-### 5. Deploy
+### 6. Deploy
 
 1. Click **Deploy** in Dokploy
 2. Dokploy will:
    - Clone your repository
-   - Build the Docker images
-   - Start PostgreSQL and load the database dump
+   - Build the Docker image
    - Start the application
    - Set up reverse proxy
 
-### 6. Verify Deployment
+### 7. Verify Deployment
 
 Once deployed, check:
 
@@ -88,19 +99,16 @@ To enable automatic deployments on code changes:
 ## Database Management
 
 ### Initial Setup
-- The database dump (`quranhub_snapshot_dump.sql`) is automatically loaded on first deployment
-- This happens only once when the PostgreSQL container is first initialized
+- You need to manually load the database dump (`database/quranhub_snapshot_dump.sql`) into your external PostgreSQL database
+- Use `psql` or a database management tool to import the dump:
+  ```bash
+  psql -h your_database_host -U your_username -d your_database_name -f database/quranhub_snapshot_dump.sql
+  ```
 
-### Resetting the Database
-If you need to reload the database:
-
-1. In Dokploy, stop the application
-2. Remove the PostgreSQL volume (via Dokploy's volume management or SSH)
-3. Redeploy the application
-
-### Accessing the Database
-- The PostgreSQL service is internal to the Docker network
-- To access it externally, you may need to expose the port or use Dokploy's database management features
+### Database Connection
+- Ensure your external database is accessible from the Dokploy network
+- Check firewall rules and network security groups
+- For cloud databases, you may need to whitelist Dokploy's IP addresses
 
 ## Troubleshooting
 
@@ -114,25 +122,26 @@ If you need to reload the database:
 #### Password Authentication Failed Error
 If you see `password authentication failed for user "quranhub"`, this usually means:
 
-1. **Database was initialized with different credentials**: The PostgreSQL volume already exists with old credentials
-   - **Solution**: Remove the PostgreSQL volume and redeploy
-   - In Dokploy: Stop the application → Go to Volumes → Delete `postgres_data` volume → Redeploy
-   - Or via SSH: `docker volume rm quranhub_postgres_data` (adjust name as needed)
+1. **Incorrect credentials**: The database credentials don't match
+   - **Solution**: Verify your `DB_USERNAME` and `DB_PASSWORD` environment variables match your external database
+   - Double-check the credentials in your database management interface
 
-2. **Environment variables mismatch**: The credentials in Dokploy don't match what PostgreSQL expects
-   - **Solution**: Ensure all environment variables are set correctly:
-     - `DB_USERNAME` must match `POSTGRES_USER` in the postgres service
-     - `DB_PASSWORD` must match `POSTGRES_PASSWORD` in the postgres service
-     - Both services use the same values from environment variables
+2. **Database host unreachable**: The application cannot connect to the database host
+   - **Solution**: 
+     - Verify `DB_HOST` is correct (hostname or IP address)
+     - Check network connectivity from Dokploy to your database
+     - Ensure firewall rules allow connections from Dokploy's network
+     - For cloud databases, verify security groups allow inbound connections on port 5432
 
 3. **Special characters in password**: If your password contains special characters, they may need URL encoding
    - **Solution**: Use a password without special characters, or ensure proper URL encoding in `DATABASE_URL`
 
 #### Other Database Issues
-- Verify `DB_HOST=postgres` (must match service name)
-- Check that PostgreSQL container is healthy
-- Review database logs in Dokploy
+- Verify `DB_HOST` points to your external database hostname/IP
+- Check that your external PostgreSQL database is running and accessible
+- Review database connection logs in Dokploy
 - Ensure `DATABASE_URL` is correctly formatted: `postgresql://username:password@host:port/database`
+- Test database connectivity using `psql` or a database client from the same network
 
 ### Port Conflicts
 - Dokploy handles port mapping automatically via reverse proxy
@@ -142,11 +151,11 @@ If you see `password authentication failed for user "quranhub"`, this usually me
 
 | Variable | Description | Default | Required |
 |----------|-------------|---------|----------|
-| `DB_USERNAME` | PostgreSQL username | `quranhub` | No |
+| `DB_USERNAME` | PostgreSQL username | `quranhub` | **Yes** |
 | `DB_PASSWORD` | PostgreSQL password | - | **Yes** |
-| `DB_HOST` | Database host (service name) | `postgres` | No |
+| `DB_HOST` | External database hostname or IP | `localhost` | **Yes** |
 | `DB_PORT` | Database port | `5432` | No |
-| `DB_NAME` | Database name | `quranhub` | No |
+| `DB_NAME` | Database name | `quranhub` | **Yes** |
 | `APP_PORT` | Application port | `8080` | No |
 
 ## Support

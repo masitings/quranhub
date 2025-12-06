@@ -110,9 +110,29 @@ If you need to reload the database:
 - Ensure PostgreSQL health check is passing
 
 ### Database Connection Issues
+
+#### Password Authentication Failed Error
+If you see `password authentication failed for user "quranhub"`, this usually means:
+
+1. **Database was initialized with different credentials**: The PostgreSQL volume already exists with old credentials
+   - **Solution**: Remove the PostgreSQL volume and redeploy
+   - In Dokploy: Stop the application → Go to Volumes → Delete `postgres_data` volume → Redeploy
+   - Or via SSH: `docker volume rm quranhub_postgres_data` (adjust name as needed)
+
+2. **Environment variables mismatch**: The credentials in Dokploy don't match what PostgreSQL expects
+   - **Solution**: Ensure all environment variables are set correctly:
+     - `DB_USERNAME` must match `POSTGRES_USER` in the postgres service
+     - `DB_PASSWORD` must match `POSTGRES_PASSWORD` in the postgres service
+     - Both services use the same values from environment variables
+
+3. **Special characters in password**: If your password contains special characters, they may need URL encoding
+   - **Solution**: Use a password without special characters, or ensure proper URL encoding in `DATABASE_URL`
+
+#### Other Database Issues
 - Verify `DB_HOST=postgres` (must match service name)
 - Check that PostgreSQL container is healthy
 - Review database logs in Dokploy
+- Ensure `DATABASE_URL` is correctly formatted: `postgresql://username:password@host:port/database`
 
 ### Port Conflicts
 - Dokploy handles port mapping automatically via reverse proxy

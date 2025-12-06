@@ -7,8 +7,21 @@ from sqlalchemy.orm import DeclarativeBase
 
 # Load environment variables from .env file
 load_dotenv()
+
+# Get DATABASE_URL or construct it from individual components
 SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL")
-ASYNC_SQLALCHEMY_DATABASE_URL=SQLALCHEMY_DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://")
+
+# If DATABASE_URL is not set, construct it from individual components
+if not SQLALCHEMY_DATABASE_URL:
+    DB_USERNAME = os.getenv("DB_USERNAME", "quranhub")
+    DB_PASSWORD = os.getenv("DB_PASSWORD", "quranhub_password")
+    DB_HOST = os.getenv("DB_HOST", "postgres")
+    DB_PORT = os.getenv("DB_PORT", "5432")
+    DB_NAME = os.getenv("DB_NAME", "quranhub")
+    SQLALCHEMY_DATABASE_URL = f"postgresql://{DB_USERNAME}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+
+# Convert to asyncpg URL format
+ASYNC_SQLALCHEMY_DATABASE_URL = SQLALCHEMY_DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://")
 
 
 # Create an async engine with optimized connection pooling

@@ -38,6 +38,7 @@ services:
       DB_HOST: postgres
       DB_PORT: ${DB_PORT:-5432}
       DB_NAME: ${DB_NAME:-quranhub}
+      # Construct DATABASE_URL from components (URL encoding for special characters in password)
       DATABASE_URL: postgresql://${DB_USERNAME:-quranhub}:${DB_PASSWORD:-quranhub_password}@postgres:${DB_PORT:-5432}/${DB_NAME:-quranhub}
     # Port mapping - Dokploy will handle this automatically via reverse proxy
     # Keep this for local development or if Dokploy doesn't auto-detect
